@@ -1,73 +1,656 @@
 <!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rasengan AR</title>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>RASENGAN AR</title>
+
 <style>
-html,body{margin:0;background:#000;overflow:hidden}
-video,canvas{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
-#start{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:16px 28px;font-size:20px;z-index:10}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+html,body{
+width:100%;
+height:100%;
+overflow:hidden;
+background:black;
+font-family:Arial,sans-serif;
+}
+
+#camera{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+object-fit:cover;
+transform:scaleX(-1);
+z-index:1;
+}
+
+#canvas{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+pointer-events:none;
+z-index:2;
+}
+
+#startScreen{
+position:fixed;
+inset:0;
+
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+
+background:
+radial-gradient(
+circle,
+rgba(0,120,255,.2),
+black 70%
+);
+
+z-index:9999;
+}
+
+#title{
+
+font-size:48px;
+font-weight:bold;
+
+color:#7ad7ff;
+
+text-shadow:
+0 0 10px #00aaff,
+0 0 20px #00aaff,
+0 0 40px #00aaff,
+0 0 80px #00aaff;
+
+}
+
+#subtitle{
+
+margin-top:10px;
+
+font-size:15px;
+
+color:white;
+
+opacity:.8;
+
+}
+
+#startBtn{
+
+margin-top:35px;
+
+padding:16px 45px;
+
+font-size:20px;
+
+font-weight:bold;
+
+border:none;
+
+border-radius:50px;
+
+cursor:pointer;
+
+color:white;
+
+background:
+linear-gradient(
+45deg,
+#005eff,
+#00c8ff
+);
+
+box-shadow:
+0 0 20px #00aaff,
+0 0 50px #00aaff;
+
+}
+
+#loading{
+
+margin-top:15px;
+
+font-size:13px;
+
+color:white;
+
+opacity:.7;
+
+}
+
 </style>
+
 </head>
+
 <body>
-<button id="start">Start Jutsu ⚡</button>
-<video id="cam" autoplay playsinline muted></video>
-<canvas id="c"></canvas>
+
+<div id="startScreen">
+
+<div id="title">
+RASENGAN
+</div>
+
+<div id="subtitle">
+Naruto Hand Tracking Jutsu
+</div>
+
+<button id="startBtn">
+START JUTSU ⚡
+</button>
+
+<div id="loading">
+Allow Camera Permission
+</div>
+
+</div>
+
+<video
+id="camera"
+autoplay
+playsinline
+muted>
+</video>
+
+<canvas id="canvas"></canvas>
+
+<video
+id="rasenganVideo"
+src="rasengan.mp4"
+loop
+muted
+playsinline
+style="display:none">
+</video>
+
+<audio
+id="rasenganSound"
+src="rasengan.aac"
+loop>
+</audio>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-const cam=document.getElementById('cam');
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
-let handPos=null;
 
-function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
+const cameraVideo =
+document.getElementById("camera");
+
+const canvas =
+document.getElementById("canvas");
+
+const ctx =
+canvas.getContext("2d");
+
+const startBtn =
+document.getElementById("startBtn");
+
+const startScreen =
+document.getElementById("startScreen");
+
+const rasenganVideo =
+document.getElementById("rasenganVideo");
+
+const rasenganSound =
+document.getElementById("rasenganSound");
+
+let handX = 0;
+let handY = 0;
+let handDetected = false;
+
+function resize(){
+
+canvas.width =
+window.innerWidth;
+
+canvas.height =
+window.innerHeight;
+
+}
+
 resize();
-window.addEventListener('resize',resize);
 
-document.getElementById('start').onclick=async()=>{
- const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});
- cam.srcObject=stream;
- document.getElementById('start').remove();
+window.addEventListener(
+"resize",
+resize
+);
+// =========================
+// START JUTSU
+// =========================
 
- const hands=new Hands({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
- hands.setOptions({maxNumHands:1,minDetectionConfidence:0.7,minTrackingConfidence:0.7});
+startBtn.addEventListener(
+"click",
+async()=>{
 
- hands.onResults((r)=>{
-   if(r.multiHandLandmarks && r.multiHandLandmarks.length){
-     const p=r.multiHandLandmarks[0][9];
-     handPos={x:p.x*canvas.width,y:p.y*canvas.height};
-   }
- });
+try{
 
- const camera=new Camera(cam,{
-   onFrame:async()=>{await hands.send({image:cam});},
-   width:1280,height:720
- });
- camera.start();
- requestAnimationFrame(loop);
-};
+const stream =
+await navigator.mediaDevices.getUserMedia({
+video:{
+facingMode:"user"
+},
+audio:false
+});
 
-function drawRasengan(x,y){
- for(let i=6;i>0;i--){
-   ctx.beginPath();
-   ctx.arc(x,y,25+i*8,0,Math.PI*2);
-   ctx.strokeStyle=`rgba(80,180,255,${0.12*i})`;
-   ctx.lineWidth=4;
-   ctx.stroke();
+cameraVideo.srcObject =
+stream;
+
+await cameraVideo.play();
+
+await rasenganVideo.play();
+
+try{
+await rasenganSound.play();
+}catch(e){}
+
+startScreen.style.display =
+"none";
+
+initHands();
+
+}
+catch(err){
+
+alert(
+"Camera Permission Required!"
+);
+
+console.log(err);
+
+}
+
+});
+
+// =========================
+// MEDIAPIPE HANDS
+// =========================
+
+let hands;
+
+function initHands(){
+
+hands = new Hands({
+
+locateFile:(file)=>{
+
+return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+
+}
+
+});
+
+hands.setOptions({
+
+maxNumHands:1,
+
+modelComplexity:1,
+
+minDetectionConfidence:0.7,
+
+minTrackingConfidence:0.7
+
+});
+
+hands.onResults(onResults);
+
+const camera =
+new Camera(
+cameraVideo,
+{
+
+onFrame:async()=>{
+
+await hands.send({
+image:cameraVideo
+});
+
+},
+
+width:1280,
+height:720
+
+}
+);
+
+camera.start();
+
+requestAnimationFrame(
+animate
+);
+
+}
+
+// =========================
+// HAND TRACKING
+// =========================
+
+function onResults(results){
+
+handDetected = false;
+
+if(
+results.multiHandLandmarks &&
+results.multiHandLandmarks.length
+){
+
+const hand =
+results.multiHandLandmarks[0];
+
+const palm =
+hand[9];
+
+handX =
+canvas.width -
+(palm.x * canvas.width);
+
+handY =
+palm.y *
+canvas.height;
+
+handDetected = true;
+
+}
+
+}
+
+// =========================
+// PARTICLES
+// =========================
+
+let particles = [];
+
+function createParticle(x,y){
+
+particles.push({
+
+x:x,
+y:y,
+
+vx:(Math.random()-0.5)*4,
+vy:(Math.random()-0.5)*4,
+
+life:60,
+size:Math.random()*4+2
+
+});
+
+}
+
+function updateParticles(){
+
+for(let i=particles.length-1;i>=0;i--){
+
+let p =
+particles[i];
+
+p.x += p.vx;
+p.y += p.vy;
+
+p.life--;
+
+ctx.beginPath();
+
+ctx.arc(
+p.x,
+p.y,
+p.size,
+0,
+Math.PI*2
+);
+
+ctx.fillStyle =
+`rgba(100,200,255,${
+p.life/60
+})`;
+
+ctx.fill();
+
+if(p.life<=0){
+
+particles.splice(i,1);
+
+}
+
+}
+
+}
+
+// =========================
+// MAIN LOOP
+// =========================
+
+function animate(){
+
+ctx.clearRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+if(handDetected){
+
+for(let i=0;i<2;i++){
+
+createParticle(
+handX,
+handY
+);
+
+}
+
+}
+
+updateParticles();
+
+requestAnimationFrame(
+animate
+);
+
  }
- ctx.beginPath();
- ctx.arc(x,y,40,0,Math.PI*2);
- ctx.fillStyle='rgba(120,200,255,.85)';
- ctx.fill();
+// =========================
+// RASENGAN DRAW
+// =========================
+
+function drawRasengan(){
+
+let t =
+Date.now() * 0.01;
+
+// OUTER GLOW
+
+for(let i=6;i>0;i--){
+
+ctx.beginPath();
+
+ctx.arc(
+handX,
+handY,
+55 + (i*10),
+0,
+Math.PI*2
+);
+
+ctx.strokeStyle =
+`rgba(
+0,
+180,
+255,
+${0.05*i}
+)`;
+
+ctx.lineWidth = 8;
+
+ctx.stroke();
+
 }
 
-function loop(){
- ctx.clearRect(0,0,canvas.width,canvas.height);
- if(handPos) drawRasengan(handPos.x,handPos.y);
- requestAnimationFrame(loop);
+// CORE
+
+let gradient =
+ctx.createRadialGradient(
+handX,
+handY,
+5,
+handX,
+handY,
+60
+);
+
+gradient.addColorStop(
+0,
+"#ffffff"
+);
+
+gradient.addColorStop(
+0.3,
+"#8de7ff"
+);
+
+gradient.addColorStop(
+1,
+"#009dff"
+);
+
+ctx.beginPath();
+
+ctx.arc(
+handX,
+handY,
+55,
+0,
+Math.PI*2
+);
+
+ctx.fillStyle =
+gradient;
+
+ctx.fill();
+
+// ROTATING RINGS
+
+for(let r=0;r<3;r++){
+
+ctx.save();
+
+ctx.translate(
+handX,
+handY
+);
+
+ctx.rotate(
+t*0.03 + r
+);
+
+ctx.beginPath();
+
+ctx.ellipse(
+0,
+0,
+70+(r*8),
+30+(r*4),
+0,
+0,
+Math.PI*2
+);
+
+ctx.strokeStyle =
+"rgba(120,220,255,.7)";
+
+ctx.lineWidth =
+2;
+
+ctx.stroke();
+
+ctx.restore();
+
 }
-</script>
-</body></html>
+
+// ENERGY SPARKS
+
+for(let i=0;i<8;i++){
+
+let angle =
+(t*0.05)+
+(i*Math.PI/4);
+
+let sx =
+handX +
+Math.cos(angle)*75;
+
+let sy =
+handY +
+Math.sin(angle)*75;
+
+ctx.beginPath();
+
+ctx.arc(
+sx,
+sy,
+3,
+0,
+Math.PI*2
+);
+
+ctx.fillStyle =
+"#b9f5ff";
+
+ctx.fill();
+
+}
+
+}
+
+// =========================
+// OVERRIDE LOOP
+// =========================
+
+const oldAnimate =
+animate;
+
+animate = function(){
+
+ctx.clearRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+if(handDetected){
+
+for(let i=0;i<3;i++){
+
+createParticle(
+handX,
+handY
+);
+
+}
+
+drawRasengan();
+
+}
+
+updateParticles();
+
+requestAnimationFrame(
+animate
+);
+
+};
