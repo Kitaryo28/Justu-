@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-
-<title>RASENGAN AR FIXED</title>
+<title>RASENGAN AR</title>
 
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -42,10 +41,15 @@ flex-direction:column;
 justify-content:center;
 align-items:center;
 background:radial-gradient(circle,rgba(0,120,255,.2),black 70%);
-z-index:999;
+z-index:9999;
 }
 
-#title{font-size:45px;color:#7ad7ff;text-shadow:0 0 20px #00aaff;}
+#title{
+font-size:45px;
+color:#7ad7ff;
+text-shadow:0 0 20px #00aaff;
+}
+
 #startBtn{
 margin-top:30px;
 padding:15px 40px;
@@ -70,18 +74,22 @@ cursor:pointer;
 <video id="camera" autoplay playsinline muted></video>
 <canvas id="canvas"></canvas>
 
+<!-- 🔊 SOUND ADDED -->
+<audio id="rasenganSound" src="rasengan.mp3" loop></audio>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 
-const cameraVideo = document.getElementById("camera");
+const video = document.getElementById("camera");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const startBtn = document.getElementById("startBtn");
-const startScreen = document.getElementById("startScreen");
+const screen = document.getElementById("startScreen");
+const sound = document.getElementById("rasenganSound");
 
-let handX=0, handY=0, handDetected=false;
+let handX=0, handY=0, detected=false;
 let particles=[];
 
 function resize(){
@@ -91,27 +99,32 @@ canvas.height=innerHeight;
 resize();
 addEventListener("resize",resize);
 
-// BACK CAMERA FIXED START
+// ================= START =================
 startBtn.onclick = async ()=>{
 
 try{
 
+// 📷 BACK CAMERA FIX (with fallback)
 const stream = await navigator.mediaDevices.getUserMedia({
 video:{
-facingMode:{ ideal:"environment" }   // ✅ BACK CAMERA FIX
+facingMode:{ ideal:"environment" }
 },
 audio:false
 });
 
-cameraVideo.srcObject = stream;
-await cameraVideo.play();
+video.srcObject = stream;
+await video.play();
 
-startScreen.style.display="none";
+// 🔊 sound safe play
+sound.currentTime = 0;
+sound.play().catch(()=>{});
+
+screen.style.display="none";
 
 initHands();
 
 }catch(e){
-alert("Camera permission denied / not supported");
+alert("Camera error / permission denied");
 console.log(e);
 }
 
@@ -135,22 +148,23 @@ minTrackingConfidence:0.7
 
 hands.onResults(onResults);
 
-// renamed camera (IMPORTANT FIX)
-const mpCamera = new Camera(cameraVideo,{
+// 📷 FIX: separate camera object (no conflict)
+const mpCamera = new Camera(video,{
 onFrame:async()=>{
-await hands.send({image:cameraVideo});
+await hands.send({image:video});
 },
 width:1280,
 height:720
 });
 
 mpCamera.start();
+
 requestAnimationFrame(loop);
 }
 
 function onResults(results){
 
-handDetected=false;
+detected=false;
 
 if(results.multiHandLandmarks?.length){
 
@@ -160,12 +174,12 @@ const palm = hand[9];
 handX = canvas.width - palm.x * canvas.width;
 handY = palm.y * canvas.height;
 
-handDetected=true;
+detected=true;
 }
 }
 
 // ================= PARTICLES =================
-function createParticle(x,y){
+function addParticle(x,y){
 particles.push({
 x,y,
 vx:(Math.random()-0.5)*4,
@@ -193,16 +207,16 @@ if(p.life<=0)particles.splice(i,1);
 }
 }
 
-// ================= RASENGAN =================
+// ================= RASENGAN EFFECT =================
 function drawRasengan(){
 
-let t=Date.now()*0.01;
+let t = Date.now()*0.01;
 
-// glow rings
-for(let i=6;i>0;i--){
+// glow
+for(let i=5;i>0;i--){
 ctx.beginPath();
 ctx.arc(handX,handY,55+i*10,0,Math.PI*2);
-ctx.strokeStyle=`rgba(0,180,255,${0.05*i})`;
+ctx.strokeStyle=`rgba(0,180,255,${0.06*i})`;
 ctx.lineWidth=6;
 ctx.stroke();
 }
@@ -230,21 +244,24 @@ ctx.strokeStyle="rgba(120,220,255,.7)";
 ctx.stroke();
 ctx.restore();
 }
+
+// particles spawn
+for(let i=0;i<3;i++){
+addParticle(handX,handY);
+}
 }
 
-// ================= MAIN LOOP =================
+// ================= LOOP FIXED =================
 function loop(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-if(handDetected){
-for(let i=0;i<3;i++){
-createParticle(handX,handY);
-}
+if(detected){
 drawRasengan();
 }
 
 updateParticles();
+
 requestAnimationFrame(loop);
 }
 
